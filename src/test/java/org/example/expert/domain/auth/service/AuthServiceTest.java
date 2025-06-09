@@ -61,6 +61,7 @@ public class AuthServiceTest {
             authService.signup(signupRequest);
         });
 
+
         // Then : 시나리오를 완료했을 때 보장해야 하는 결과를 명시, 예상되는 변화 설명
         // assertEquals 두 값이 동일한지 비교 (exception에 있는 메세지와 비교)
         assertEquals("이미 존재하는 이메일입니다.", exception.getMessage());
