@@ -23,7 +23,10 @@ public class Todo extends Timestamped {
     private String contents;
     private String weather;
 
-    @ManyToOne(fetch = FetchType.LAZY)
+    // fetch = FetchType.EAGER
+    // 엔티티 연관 관계를 매핑하여 즉시로딩 할 수 있음
+    // 메모리 낭비 이슈가 있음
+    @ManyToOne(fetch = FetchType.LAZY) // LAZY 로딩
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
