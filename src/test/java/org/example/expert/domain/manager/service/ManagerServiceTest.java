@@ -46,7 +46,8 @@ class ManagerServiceTest {
 
         // when & then
         InvalidRequestException exception = assertThrows(InvalidRequestException.class, () -> managerService.getManagers(todoId));
-        assertEquals("Manager not found", exception.getMessage());
+        assertEquals("Todo not found", exception.getMessage());
+        // Todo가 없을때 발생하는 예외 메세지이므로 Todo not found 로 변환
     }
 
     @Test
@@ -58,6 +59,7 @@ class ManagerServiceTest {
 
         Todo todo = new Todo();
         ReflectionTestUtils.setField(todo, "user", null);
+        // todo 유저가 null인경우
 
         ManagerSaveRequest managerSaveRequest = new ManagerSaveRequest(managerUserId);
 
