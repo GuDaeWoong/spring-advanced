@@ -1,9 +1,9 @@
 # SPRING ADVANCED
 
 
-## Lv1 코드 개선
+# Lv1 코드 개선
 
-### 1. 문제 인식 및 정의
+### 1-1. 문제 인식 및 정의
 현재 회원가입 서비스 로직은 불필요한 연산을 수행하고 있습니다. 회원 정보 저장 전에 이메일 중복 검증이 제대로 이루어지지 않아, 이미 존재하는 이메일로 회원가입을 시도할 경우에 비밀번호 인코딩, 사용자 권한 삽입 작업이 실행되는 문제가 있습니다.
 
 기존 코드 순서:
@@ -36,7 +36,45 @@
 <br>
 <br>
 
-## Lv2. N+1 문제
+### 1-2. 문제 인식 및 정의
+WeatherClient 클래스 내 getTodayWeather() 메서드는 복잡한 if-else 구조를 가지고 있었습니다. 이 구조는 코드의 가독성을 떨어뜨리고, 향후 유지보수를 어렵게 만드는 문제를 야기했습니다. 특히, 예외 처리 로직이 중첩된 if-else 블록 안에 있어 코드의 흐름을 파악하기 힘들었습니다.
+
+### 2. 해결 방안( SRP(단일 책임 원칙) 적용을 통한 예외 처리 분리 )
+객체지향 설계 원칙 중 하나인 SRP(단일 책임 원칙)는 클래스나 모듈이 오직 하나의 책임만 가져야 한다는 원칙입니다. 이번 개선에서는 완벽한 SRP 적용보다는, 예외 처리 로직을 분리하여 getTodayWeather() 메서드의 가독성을 높이는 데 중점을 두었습니다.
+
+		// 원본 코드
+		WeatherDto[] weatherArray = responseEntity.getBody();
+        if (!HttpStatus.OK.equals(responseEntity.getStatusCode())) {
+            throw new ServerException("날씨 데이터를 가져오는데 실패했습니다. 상태 코드: " + responseEntity.getStatusCode());
+        } else {
+            if (weatherArray == null || weatherArray.length == 0) {
+                throw new ServerException("날씨 데이터가 없습니다.");
+            }
+        }
+
+		// 수정된 코드
+        WeatherDto[] weatherArray = responseEntity.getBody();
+        if (!HttpStatus.OK.equals(responseEntity.getStatusCode())) {
+            throw new ServerException("날씨 데이터를 가져오는데 실패했습니다. 상태 코드: " + responseEntity.getStatusCode());
+        }
+        if (weatherArray == null || weatherArray.length == 0) {
+            throw new ServerException("날씨 데이터가 없습니다.");
+        }
+
+수정된 코드에서는 각 예외 처리 조건을 별도의 if 블록으로 분리했습니다. 
+- 가독성 향상: 각 예외 조건이 명확히 분리되어 코드의 흐름을 이해하기 쉬워집니다.
+- 유지보수 용이성: 특정 예외 처리 로직을 수정하거나 추가할 때, 다른 조건에 영향을 주지 않고 해당 부분만 변경할 수 있습니다.
+- 조기 종료: 잘못된 상태 코드나 데이터가 없을 경우, 더 이상 코드 실행을 진행하지 않고 즉시 예외를 발생시켜 불필요한 연산을 방지합니다.
+
+### 3. 해결 완료
+getTodayWeather() 메서드의 중첩된 if-else 구조를 독립적인 if 블록으로 분리하여 예외 처리 로직의 가독성을 크게 향상시켰습니다. 
+
+
+<br>
+<br>
+
+
+# Lv2. N+1 문제
 
 ### 1. 문제 인식 및 정의
 현재 JPQL 쿼리 @Query("SELECT t FROM Todo t LEFT JOIN FETCH t.user u ORDER BY t.modifiedAt DESC")는 모든 Todo 항목을 가져오며, 연결된 User 항목을 함께 가져오려 합니다. 하지만 User 엔티티의 FetchType이 LAZY로 설정되어 있어, Todo 항목을 조회할 때마다 해당 Todo에 연결된 User 정보를 가져오기 위해 추가적인 쿼리가 발생합니다.  
