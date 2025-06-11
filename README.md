@@ -194,18 +194,18 @@ org.example.expert.domain.manager.service 패키지의 ManagerServiceTest 클래
 - todo.getUser()가 null일 경우를 대비하여 아래 조건문에 null이 들어왔을 경우를 추가로 제어해주었습니다.
 
 
-    // 수정 코드
-    InvalidRequestException exception = assertThrows(InvalidRequestException.class, () -> managerService.getManagers(todoId));
-    assertEquals("Todo not found", exception.getMessage());
-    // Todo가 없을때 발생하는 예외 메세지이므로 Todo not found 로 변환
+        // 수정 코드
+        InvalidRequestException exception = assertThrows(InvalidRequestException.class, () -> managerService.getManagers(todoId));
+        assertEquals("Todo not found", exception.getMessage());
+        // Todo가 없을때 발생하는 예외 메세지이므로 Todo not found 로 변환
 
-    Todo todo = todoRepository.findById(todoId)
+        Todo todo = todoRepository.findById(todoId)
                 .orElseThrow(() -> new InvalidRequestException("Todo not found"));
 
-    // todo.getUser() == null 추가 해주지않으면 nullpointexception이 발생
-    if (todo.getUser() == null || !ObjectUtils.nullSafeEquals(user.getId(), todo.getUser().getId())) {
-    throw new InvalidRequestException("담당자를 등록하려고 하는 유저가 일정을 만든 유저가 유효하지 않습니다.");
-    }
+        // todo.getUser() == null 추가 해주지않으면 nullpointexception이 발생
+        if (todo.getUser() == null || !ObjectUtils.nullSafeEquals(user.getId(), todo.getUser().getId())) {
+        throw new InvalidRequestException("담당자를 등록하려고 하는 유저가 일정을 만든 유저가 유효하지 않습니다.");
+        }
 
 
 
