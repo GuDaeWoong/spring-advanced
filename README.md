@@ -165,6 +165,66 @@ PassEncoderTest 클래스 내 passwordEncoder.matches() 호출 시 인자 순서
 
 
 ### 3-2. 문제 인식 및 정의
+comment_등록_중_할일을_찾지_못해_에러가_발생한다 테스트 케이스에서 commentService.saveComment 호출 시 Todo를 찾지 못하는 상황을 테스트하고 있습니다. 하지만 assertThrows로 ServerException을 기대하는 반면, 실제 서비스 로직에서는 Todo를 찾지 못할 경우 InvalidRequestException을 던지도록 되어 있어 테스트가 실패하고 있습니다.
+
+    //실패 코드
+    @Test
+    public void comment_등록_중_할일을_찾지_못해_에러가_발생한다() {
+        // given
+        long todoId = 1;
+        CommentSaveRequest request = new CommentSaveRequest("contents");
+        AuthUser authUser = new AuthUser(1L, "email", UserRole.USER);
+
+        given(todoRepository.findById(anyLong())).willReturn(Optional.empty());
+
+        // when
+        ServerException exception = assertThrows(ServerException.class, () -> {
+            commentService.saveComment(authUser, todoId, request);
+        });
+
+        // then
+        assertEquals("Todo not found", exception.getMessage());
+    }
+
+    //검증 대상
+    Todo todo = todoRepository.findById(todoId).orElseThrow(() ->
+        new InvalidRequestException("Todo not found"));
+
+
+### 2. 해결 방안
+테스트 코드에서 기대하는 예외 타입을 실제 서비스 로직에서 발생하는 예외 타입과 일치시키는 것입니다. Todo를 찾지 못했을 때 InvalidRequestException이 발생하는 것이 올바른 동작이므로, 테스트 코드도 InvalidRequestException을 assertThrows로 검증하도록 변경해야 합니다.
+
+
+    // 수정 코드
+    @Test
+    public void comment_등록_중_할일을_찾지_못해_에러가_발생한다() {
+        // given
+        long todoId = 1;
+        CommentSaveRequest request = new CommentSaveRequest("contents");
+        AuthUser authUser = new AuthUser(1L, "email", UserRole.USER);
+
+        given(todoRepository.findById(anyLong())).willReturn(Optional.empty());
+
+        // when
+        InvalidRequestException exception = assertThrows(InvalidRequestException.class, () -> {
+                commentService.saveComment(authUser, todoId, request);
+        });
+
+        // then
+        assertEquals("Todo not found", exception.getMessage());
+    }
+
+
+
+### 3. 해결 완료
+comment_등록_중_할일을_찾지_못해_에러가_발생한다() 테스트 케이스에서 assertThrows가 기대하는 예외 타입을 ServerException에서 InvalidRequestException으로 변경하여 문제를 해결했습니다.
+
+
+<br>
+<br>
+
+
+### 3-3. 문제 인식 및 정의
 org.example.expert.domain.manager.service 패키지의 ManagerServiceTest 클래스에서 manager_목록_조회_시_Todo가_없다면_NPE_에러를_던진다() 테스트 케이스가 NullPointerException을 발생시킬 수 있는 문제를 안고 있었습니다.  
 테스트 코드는 todoRepository.findById(todoId)가 Optional.empty()를 반환할 때 InvalidRequestException이 발생하는지 검증하려 했으나, 실제 서비스 로직에서는 todo.getUser().getId() 호출 시 todo.getUser()가 null일 경우 NullPointerException이 발생할 수 있었습니다. 테스트가 기대하는 예외 메시지("Manager not found")와 실제 발생하는 예외(NullPointerException)가 달라서 테스트가 실패합니다.
 
