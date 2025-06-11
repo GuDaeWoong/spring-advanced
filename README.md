@@ -42,8 +42,8 @@ WeatherClient 클래스 내 getTodayWeather() 메서드는 복잡한 if-else 구
 ### 2. 해결 방안( SRP(단일 책임 원칙) 적용을 통한 예외 처리 분리 )
 객체지향 설계 원칙 중 하나인 SRP(단일 책임 원칙)는 클래스나 모듈이 오직 하나의 책임만 가져야 한다는 원칙입니다. 이번 개선에서는 완벽한 SRP 적용보다는, 예외 처리 로직을 분리하여 getTodayWeather() 메서드의 가독성을 높이는 데 중점을 두었습니다.
 
-		// 원본 코드
-		WeatherDto[] weatherArray = responseEntity.getBody();
+        // 원본 코드
+        WeatherDto[] weatherArray = responseEntity.getBody();
         if (!HttpStatus.OK.equals(responseEntity.getStatusCode())) {
             throw new ServerException("날씨 데이터를 가져오는데 실패했습니다. 상태 코드: " + responseEntity.getStatusCode());
         } else {
@@ -52,7 +52,7 @@ WeatherClient 클래스 내 getTodayWeather() 메서드는 복잡한 if-else 구
             }
         }
 
-		// 수정된 코드
+        // 수정된 코드
         WeatherDto[] weatherArray = responseEntity.getBody();
         if (!HttpStatus.OK.equals(responseEntity.getStatusCode())) {
             throw new ServerException("날씨 데이터를 가져오는데 실패했습니다. 상태 코드: " + responseEntity.getStatusCode());
@@ -125,3 +125,28 @@ getTodayWeather() 메서드의 중첩된 if-else 구조를 독립적인 if 블�
 
 @Query("SELECT t FROM Todo t LEFT JOIN FETCH t.user u ORDER BY t.modifiedAt DESC")   
 기존 쿼리가 Todo와 User 정보만 필요로 하는 것을 고려하여, @EntityGraph를 사용해 Todo를 가져올 때 연관된 User 엔티티를 즉시 로딩하도록 설정했습니다. @EntityGraph(attributePaths = "user")
+
+
+# Lv3. 테스트코드
+
+### 3-1. 문제 인식 및 정의
+org.example.expert.config 패키지의 PassEncoderTest 클래스에 포함된 테스트 케이스가 정상적으로 동작하지 않는 문제가 발생했습니다. 비밀번호 매칭 여부를 확인하는 assertTrue(matches); 구문이 false를 반환하며 테스트가 실패하고 있었습니다.
+
+        //실패 코드
+        // when
+        boolean matches = passwordEncoder.matches(encodedPassword,rawPassword);
+        // then
+        assertTrue(matches);
+
+### 2. 해결 방안
+passwordEncoder.matches() 메서드의 인자 전달 순서가 잘못된 것으로 파악되었습니다. 
+matches 메서드의 내부 로직 (BCrypt.verifyer().verify(rawPassword.toCharArray(), encodedPassword))을 고려할 때, rawPassword (평문 비밀번호)가 첫 번째 인자로, encodedPassword (인코딩된 비밀번호)가 두 번째 인자로 전달되어야 합니다. 그러나 테스트 코드에서는 이 순서가 반대로 되어 있었습니다. PassEncoderTest 클래스의 when 섹션에서 passwordEncoder.matches() 호출 시 인자의 순서를 올바르게 변경해야 합니다.
+
+        // when
+        boolean matches = passwordEncoder.matches(rawPassword,encodedPassword);
+
+        // then
+        assertTrue(matches);
+
+### 3. 해결 완료
+PassEncoderTest 클래스 내 passwordEncoder.matches() 호출 시 인자 순서를 rawPassword 다음에 encodedPassword가 오도록 수정하여 문제를 해결했습니다.
