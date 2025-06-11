@@ -166,7 +166,7 @@ PassEncoderTest 클래스 내 passwordEncoder.matches() 호출 시 인자 순서
 
 ### 3-2. 문제 인식 및 정의
 comment_등록_중_할일을_찾지_못해_에러가_발생한다 테스트 케이스에서 commentService.saveComment 호출 시 Todo를 찾지 못하는 상황을 테스트하고 있습니다. 하지만 assertThrows로 ServerException을 기대하는 반면, 실제 서비스 로직에서는 Todo를 찾지 못할 경우 InvalidRequestException을 던지도록 되어 있어 테스트가 실패하고 있습니다.
-
+```
     //실패 코드
     @Test
     public void comment_등록_중_할일을_찾지_못해_에러가_발생한다() {
@@ -189,12 +189,12 @@ comment_등록_중_할일을_찾지_못해_에러가_발생한다 테스트 케�
     //검증 대상
     Todo todo = todoRepository.findById(todoId).orElseThrow(() ->
         new InvalidRequestException("Todo not found"));
-
+```
 
 ### 2. 해결 방안
 테스트 코드에서 기대하는 예외 타입을 실제 서비스 로직에서 발생하는 예외 타입과 일치시키는 것입니다. Todo를 찾지 못했을 때 InvalidRequestException이 발생하는 것이 올바른 동작이므로, 테스트 코드도 InvalidRequestException을 assertThrows로 검증하도록 변경해야 합니다.
 
-
+```
     // 수정 코드
     @Test
     public void comment_등록_중_할일을_찾지_못해_에러가_발생한다() {
@@ -213,7 +213,7 @@ comment_등록_중_할일을_찾지_못해_에러가_발생한다 테스트 케�
         // then
         assertEquals("Todo not found", exception.getMessage());
     }
-
+```
 
 
 ### 3. 해결 완료
@@ -227,7 +227,7 @@ comment_등록_중_할일을_찾지_못해_에러가_발생한다() 테스트 �
 ### 3-3. 문제 인식 및 정의
 org.example.expert.domain.manager.service 패키지의 ManagerServiceTest 클래스에서 manager_목록_조회_시_Todo가_없다면_NPE_에러를_던진다() 테스트 케이스가 NullPointerException을 발생시킬 수 있는 문제를 안고 있었습니다.  
 테스트 코드는 todoRepository.findById(todoId)가 Optional.empty()를 반환할 때 InvalidRequestException이 발생하는지 검증하려 했으나, 실제 서비스 로직에서는 todo.getUser().getId() 호출 시 todo.getUser()가 null일 경우 NullPointerException이 발생할 수 있었습니다. 테스트가 기대하는 예외 메시지("Manager not found")와 실제 발생하는 예외(NullPointerException)가 달라서 테스트가 실패합니다.
-
+```
     //실패 코드
     @Test
     public void manager_목록_조회_시_Todo가_없다면_NPE_에러를_던진다() {
@@ -247,13 +247,13 @@ org.example.expert.domain.manager.service 패키지의 ManagerServiceTest 클래
     if (!ObjectUtils.nullSafeEquals(user.getId(), todo.getUser().getId())) {
         throw new InvalidRequestException("담당자를 등록하려고 하는 유저가 일정을 만든 유저가 유효하지 않습니다.");
     }
-
+```
 ### 2. 해결 방안
 이 문제를 해결하기 위해 두가지 수정이 필요했습니다.
 - Todo가 없을 때 발생하는 예외 메시지는 서비스 로직에서 명확히 "Todo not found"로 정의되어 있습니다. -> 테스트코드도 동일하게 "Todo not found" 변환해주었습니다.
 - todo.getUser()가 null일 경우를 대비하여 아래 조건문에 null이 들어왔을 경우를 추가로 제어해주었습니다.
 
-
+```
         // 수정 코드
         InvalidRequestException exception = assertThrows(InvalidRequestException.class, () -> managerService.getManagers(todoId));
         assertEquals("Todo not found", exception.getMessage());
@@ -266,7 +266,7 @@ org.example.expert.domain.manager.service 패키지의 ManagerServiceTest 클래
         if (todo.getUser() == null || !ObjectUtils.nullSafeEquals(user.getId(), todo.getUser().getId())) {
         throw new InvalidRequestException("담당자를 등록하려고 하는 유저가 일정을 만든 유저가 유효하지 않습니다.");
         }
-
+```
 
 
 ### 3. 해결 완료
@@ -278,3 +278,54 @@ ManagerServiceTest의 테스트 케이스와 ManagerService의 비즈니스 로�
 <br>
 <br>
 
+# Lv4. 관리자 권한 인터셉터 적용
+
+### 1. 구현 목적
+애플리케이션 내에서 특정 기능이나 리소스에 대한 접근을 관리자(ADMIN) 권한을 가진 사용자에게만 허용해야 할 필요성이 있었습니다. 이를 위해 스프링의 HandlerInterceptor를 활용하여 요청이 컨트롤러에 도달하기 전에 사용자 권한을 검증하고, 관리자가 아닌 사용자의 접근을 차단하는 AdminInterceptor를 구현했습니다.
+
+
+### 2. 동작
+- 요청의 URI, 사용자 ID, 사용자 역할, 그리고 요청 발생 시각을 로그로 기록하여 요청 흐름을 추적하고 디버깅합니다.
+
+
+```
+  @Slf4j
+    public class AdminInterceptor implements HandlerInterceptor {
+
+    @Override
+    public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws Exception {
+        // 클라이언트가 서버로 보낸 요청에 대한 모든 정보
+        String requestURI = request.getRequestURI();
+        // userId 정보
+        String requestUserId = request.getAttribute("userId").toString();
+        // userRole 정보
+        UserRole role = UserRole.of(request.getAttribute("userRole").toString());
+
+        // URI
+        log.info("RequestURI : {}", requestURI);
+        // userId 정보
+        log.info("RequestUserId : {}", requestUserId);
+        // userRole 정보
+        log.info("RequestUserRole : {}", role);
+        // 로그 찍힌 시간
+        log.info("RequestTime : {}", LocalDateTime.now());
+
+        if (!UserRole.ADMIN.equals(role)) {
+            throw new AuthException("관리자 권한이 아닙니다.");
+        }
+        return true;
+    }
+}
+```
+
+
+### 3. 인터셉터 등록
+구현된 AdminInterceptor는 WebMvcConfigurer를 구현한 설정 클래스에서 InterceptorRegistry를 통해 등록되어 "/admin/**" 패턴에만 적용되게 적용하였습니다
+```
+    // AdminInterceptor 둥록
+    @Override
+    public void addInterceptors(InterceptorRegistry registry) {
+        registry.addInterceptor(new AdminInterceptor())
+                .addPathPatterns("/admin/**");
+    }
+```
