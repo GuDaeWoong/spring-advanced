@@ -73,6 +73,7 @@ getTodayWeather() 메서드의 중첩된 if-else 구조를 독립적인 if 블�
 <br>
 <br>
 
+
 ### 1-3. 문제 인식 및 정의
 현재 org.example.expert.domain.user.service 패키지의 UserService 클래스 내 changePassword() 메서드에는 새 비밀번호 생성 시 적용되어야 할 유효성 검증 조건(길이 8자 이상, 숫자 포함, 대문자 포함)이 포함되어 있습니다. 이러한 유효성 검증 로직을 서비스 레이어에서 직접 처리하는 것은 코드의 결합도를 높이고 서비스 메서드를 불필요하게 복잡하게 만듭니다.
 
@@ -92,8 +93,11 @@ getTodayWeather() 메서드의 중첩된 if-else 구조를 독립적인 if 블�
 
 ### 3. 해결 완료
 새 비밀번호 유효성 검증 로직을 UserChangePasswordRequest DTO로 이동하고 @Size, @Pattern 어노테이션을 사용하여 코드의 간결성과 가독성을 크게 향상시켰습니다. 이제 서비스 레이어는 핵심 비즈니스 로직에만 집중하고, 유효성 검증은 DTO와 프레임워크의 도움으로 효율적으로 처리할 수 있습니다.
+
+
 <br>
 <br>
+
 
 # Lv2. N+1 문제
 
@@ -127,6 +131,10 @@ getTodayWeather() 메서드의 중첩된 if-else 구조를 독립적인 if 블�
 기존 쿼리가 Todo와 User 정보만 필요로 하는 것을 고려하여, @EntityGraph를 사용해 Todo를 가져올 때 연관된 User 엔티티를 즉시 로딩하도록 설정했습니다. @EntityGraph(attributePaths = "user")
 
 
+<br>
+<br>
+
+
 # Lv3. 테스트코드
 
 ### 3-1. 문제 인식 및 정의
@@ -150,3 +158,63 @@ matches 메서드의 내부 로직 (BCrypt.verifyer().verify(rawPassword.toCharA
 
 ### 3. 해결 완료
 PassEncoderTest 클래스 내 passwordEncoder.matches() 호출 시 인자 순서를 rawPassword 다음에 encodedPassword가 오도록 수정하여 문제를 해결했습니다.
+
+
+<br>
+<br>
+
+
+### 3-2. 문제 인식 및 정의
+org.example.expert.domain.manager.service 패키지의 ManagerServiceTest 클래스에서 manager_목록_조회_시_Todo가_없다면_NPE_에러를_던진다() 테스트 케이스가 NullPointerException을 발생시킬 수 있는 문제를 안고 있었습니다.  
+테스트 코드는 todoRepository.findById(todoId)가 Optional.empty()를 반환할 때 InvalidRequestException이 발생하는지 검증하려 했으나, 실제 서비스 로직에서는 todo.getUser().getId() 호출 시 todo.getUser()가 null일 경우 NullPointerException이 발생할 수 있었습니다. 테스트가 기대하는 예외 메시지("Manager not found")와 실제 발생하는 예외(NullPointerException)가 달라서 테스트가 실패합니다.
+
+    //실패 코드
+    @Test
+    public void manager_목록_조회_시_Todo가_없다면_NPE_에러를_던진다() {
+        // given
+        long todoId = 1L;
+        given(todoRepository.findById(todoId)).willReturn(Optional.empty());
+
+        // when & then
+        InvalidRequestException exception = assertThrows(InvalidRequestException.class, () -> managerService.getManagers(todoId));
+        assertEquals("Manager not found", exception.getMessage());
+    }
+
+    //검증 대상
+    Todo todo = todoRepository.findById(todoId)
+        .orElseThrow(() -> new InvalidRequestException("Todo not found"));
+
+    if (!ObjectUtils.nullSafeEquals(user.getId(), todo.getUser().getId())) {
+        throw new InvalidRequestException("담당자를 등록하려고 하는 유저가 일정을 만든 유저가 유효하지 않습니다.");
+    }
+
+### 2. 해결 방안
+이 문제를 해결하기 위해 두가지 수정이 필요했습니다.
+- Todo가 없을 때 발생하는 예외 메시지는 서비스 로직에서 명확히 "Todo not found"로 정의되어 있습니다. -> 테스트코드도 동일하게 "Todo not found" 변환해주었습니다.
+- todo.getUser()가 null일 경우를 대비하여 아래 조건문에 null이 들어왔을 경우를 추가로 제어해주었습니다.
+
+
+    // 수정 코드
+    InvalidRequestException exception = assertThrows(InvalidRequestException.class, () -> managerService.getManagers(todoId));
+    assertEquals("Todo not found", exception.getMessage());
+    // Todo가 없을때 발생하는 예외 메세지이므로 Todo not found 로 변환
+
+    Todo todo = todoRepository.findById(todoId)
+                .orElseThrow(() -> new InvalidRequestException("Todo not found"));
+
+    // todo.getUser() == null 추가 해주지않으면 nullpointexception이 발생
+    if (todo.getUser() == null || !ObjectUtils.nullSafeEquals(user.getId(), todo.getUser().getId())) {
+    throw new InvalidRequestException("담당자를 등록하려고 하는 유저가 일정을 만든 유저가 유효하지 않습니다.");
+    }
+
+
+
+### 3. 해결 완료
+ManagerServiceTest의 테스트 케이스와 ManagerService의 비즈니스 로직을 모두 수정하여 문제를 해결했습니다.
+- 테스트 코드에서는 assertEquals의 기대 메시지를 서비스 로직과 일치하는 "Todo not found"로 변경했습니다.
+- 서비스 로직에서는 todo.getUser() 호출 전에 todo.getUser() == null 조건을 추가하여 NullPointerException 발생 가능성을 원천적으로 차단했습니다.
+
+
+<br>
+<br>
+
